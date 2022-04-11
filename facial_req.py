@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from imutils.video import VideoStream
+from imutils.video import VideoStream, FileVideoStream
 from pathlib import Path
 import face_recognition
 import argparse
@@ -10,7 +10,7 @@ import cv2
 import numpy as np
 
 
-def recognition_loop(video_source: int, model: str, tolerance: float):
+def recognition_loop(video_source: str, model: str, tolerance: float):
     path = Path(model)
     if not path.exists():
         print(f'Model encodings file {model} is not found.')
@@ -19,7 +19,12 @@ def recognition_loop(video_source: int, model: str, tolerance: float):
     print('Loading encodings for face detector')
     data = pickle.loads(path.open(mode='rb').read())
     print('Starting video stream')
-    vstream = VideoStream(src=video_source, framerate=10).start()
+    try:
+        video_source = int(video_source)
+        vstream = VideoStream(src=video_source, framerate=10).start()
+    except:
+        vstream = FileVideoStream(video_source).start()
+    time.sleep(2)
 
     currentname = "Unknown"
     while True:
@@ -93,12 +98,12 @@ if __name__ == "__main__":
     parser.add_argument(
         '-h', '--help', action='help', default=argparse.SUPPRESS,
         help='Press space to take a photo, escape or q to exit.')
-    parser.add_argument('-c', '--camera', help='Camera video source', default=0)
+    parser.add_argument('-v', '--video', help='Video source (camera or file)', default='0')
     parser.add_argument('-m', '--model', help='Model encodings source file', default='encodings.pickle')
     parser.add_argument('-t', '--tolerance', help='Detection tolerance', default=0.6)
     args = parser.parse_args()
-    camera = int(args.camera)
+    video = args.video
     model = args.model
     tolerance = float(args.tolerance)
-    recognition_loop(camera, model, tolerance)
+    recognition_loop(video, model, tolerance)
 
