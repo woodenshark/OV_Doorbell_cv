@@ -23,7 +23,10 @@ def recognition_loop(video_source: str, model: str, tolerance: float):
         video_source = int(video_source)
         vstream = VideoStream(src=video_source, framerate=10).start()
     except:
-        vstream = FileVideoStream(video_source).start()
+        if video_source == 'pi':
+            vstream = VideoStream(usePiCamera=True, framerate=10).start()
+        else:
+            vstream = FileVideoStream(video_source).start()
     time.sleep(2)
 
     currentname = "Unknown"
@@ -98,7 +101,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '-h', '--help', action='help', default=argparse.SUPPRESS,
         help='Press space to take a photo, escape or q to exit.')
-    parser.add_argument('-v', '--video', help='Video source (camera or file)', default='0')
+    parser.add_argument('-v', '--video', help='Video source (camera index, filepath or "pi" for picamera)', required=True)
     parser.add_argument('-m', '--model', help='Model encodings source file', default='encodings.pickle')
     parser.add_argument('-t', '--tolerance', help='Detection tolerance', default=0.6)
     args = parser.parse_args()
@@ -106,4 +109,3 @@ if __name__ == "__main__":
     model = args.model
     tolerance = float(args.tolerance)
     recognition_loop(video, model, tolerance)
-
