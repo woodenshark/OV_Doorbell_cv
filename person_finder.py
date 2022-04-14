@@ -1,3 +1,4 @@
+from typing import OrderedDict
 import cv2
 import time
 import imutils
@@ -7,6 +8,7 @@ import numpy as np
 from multiprocessing import Process
 from multiprocessing import Queue
 from imutils.video import VideoStream, FileVideoStream
+from tracker import ObjectTracker
 
 class CaffeModelLoader():
     @staticmethod
@@ -92,6 +94,32 @@ class Utils():
         for obj in objects:
             Utils.draw_object(obj, label, color, frame)
 
+    @staticmethod
+    def draw_ids(ids, color, frame):
+        for (object_id, centroid) in ids.items():
+            # draw both the ID of the object and the centroid of the
+            # object on the output frame
+            text = f'ID {object_id}'
+            cv2.putText(frame, text, (centroid[0] - 10, centroid[1] - 10),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            cv2.circle(frame, (centroid[0], centroid[1]), 4, color, -1)
+
+def track_objects(tracker, objects, frame) -> OrderedDict:
+    if (objects is None) or (len(objects) == 0):
+        tracker.update([])
+        return None
+
+    rects = []
+    for obj in objects:
+        (_, (x_start, y_start, width, height)) =  obj
+        x_end = x_start + width
+        y_end = y_start + height
+
+        rect = (x_start, y_start, x_end, y_end)
+        rects.append(rect)
+    objects = tracker.update(rects)
+    return objects
+
 def detect_in_process(proto, model, ssd_proc, frame_queue, person_queue, class_num, min_confidence):
     ssd_net = CaffeModelLoader.load(proto, model)
     ssd = ShotDetector(ssd_proc, ssd_net)
@@ -107,6 +135,7 @@ class RealtimeVideoDetector:
         self.ssd_proc = ssd_proc
         self.proto = proto
         self.model = model
+        self._delay = 0.040
 
     def detect(self, video_source, class_num, tolerance):
         try:
@@ -128,8 +157,12 @@ class RealtimeVideoDetector:
         detect_proc.start()
 
         persons = None
+        ids = None
+        tracker = ObjectTracker()
         # Capture all frames
         while(True):
+            t1 = time.time()
+
             frame = vstream.read()
             if frame is None:
                 break
@@ -139,6 +172,11 @@ class RealtimeVideoDetector:
                 #print ('Put into frame queue ...' + str(frame_num))
                 frame_queue.put(frame)
 
+            dt = time.time() - t1
+            if dt < self._delay:
+                st = self._delay - dt
+                time.sleep(st)
+
             if not person_queue.empty():
                 persons = person_queue.get()
                 # for debug
@@ -146,6 +184,10 @@ class RealtimeVideoDetector:
 
             if (persons is not None) and (len(persons) > 0):
                 Utils.draw_objects(persons, 'PERSON', (0, 0, 255), frame)
+
+            ids = track_objects(tracker, persons, frame)
+            if (ids is not None) and (len(ids) > 0):
+                Utils.draw_ids(ids, (0, 255, 0), frame)
 
             # Display the resulting frame
             cv2.imshow('Person detection', frame)
