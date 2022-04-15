@@ -81,7 +81,7 @@ class ShotDetector():
 
         return objects
 
-    def _check_inclusion(box_a, box_b):
+    def _check_inclusion(self, box_a, box_b):
         padding = 50 # for decrease target box dimensions
         pt_inside = lambda lim1, lim2, coord: lim1 < coord < lim2
         x_a, y_a, w_a, h_a = box_a
