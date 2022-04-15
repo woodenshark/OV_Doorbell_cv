@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from typing import OrderedDict
 import cv2
 import time
@@ -9,6 +10,8 @@ from multiprocessing import Process
 from multiprocessing import Queue
 from imutils.video import VideoStream, FileVideoStream
 from tracker import ObjectTracker
+from face_finder import FaceFinder
+from utils import Utils
 
 class CaffeModelLoader():
     @staticmethod
@@ -66,7 +69,7 @@ class ShotDetector():
 
         return (tolerance, obj_rect)
 
-    def get_objects(self, frame, obj_data, class_num, tolerance):
+    def find_objects(self, frame, obj_data, class_num, tolerance):
         objects = []
         for data in obj_data:
             obj_class = int(data[1])
@@ -77,34 +80,34 @@ class ShotDetector():
 
         return objects
 
-class Utils():
-    @staticmethod
-    def draw_object(obj, label, color, frame):
-        (tolerance, (x1, y1, w, h)) =  obj
-        x2 = x1 + w
-        y2 = y1 + h
-        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-        y3 = y1 - 12
-        # for debug
-        #text = label + " " + str(tolerance) + "%"
-        #cv2.putText(frame, text, (x1, y3), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1, cv2.LINE_AA)
+    def _check_inclusion(box_a, box_b):
+        padding = 50 # for decrease target box dimensions
+        pt_inside = lambda lim1, lim2, coord: lim1 < coord < lim2
+        x_a, y_a, w_a, h_a = box_a
+        x_b, y_b, w_b, h_b = box_b
+        return (pt_inside(x_a, x_a + w_a, x_b + padding) and pt_inside(x_a, x_a + w_a, x_b + w_b - padding)
+                and pt_inside(y_a, y_a + h_a, y_b + padding) and pt_inside(y_a, y_a + h_a, y_b + h_b - padding))
 
-    @staticmethod
-    def draw_objects(objects, label, color, frame):
-        for obj in objects:
-            Utils.draw_object(obj, label, color, frame)
+    def destroy_subboxes(self, objects):
+        fake_objects = []
+        for i in range(len(objects)):
+            (_, source_rect) = objects[i]
+            for j in range(len(objects)):
+                if j != i:
+                    (_, target_rect) = objects[j]
+                    if self._check_inclusion(source_rect, target_rect):
+                        fake_objects.append(objects[j])
+        for fobj in fake_objects:
+            objects.remove(fobj)
+        return objects
 
-    @staticmethod
-    def draw_ids(ids, color, frame):
-        for (object_id, centroid) in ids.items():
-            # draw both the ID of the object and the centroid of the
-            # object on the output frame
-            text = f'ID {object_id}'
-            cv2.putText(frame, text, (centroid[0] - 10, centroid[1] - 10),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-            cv2.circle(frame, (centroid[0], centroid[1]), 4, color, -1)
+    def get_objects(self, frame, obj_data, class_num, tolerance):
+        objects = self.find_objects(frame, obj_data, class_num, tolerance)
+        if (objects is not None) and (len(objects) > 0):
+            objects = self.destroy_subboxes(objects)
+        return objects
 
-def track_objects(tracker, objects, frame) -> OrderedDict:
+def track_objects(tracker, objects) -> OrderedDict:
     if (objects is None) or (len(objects) == 0):
         tracker.update([])
         return None
@@ -120,14 +123,14 @@ def track_objects(tracker, objects, frame) -> OrderedDict:
     objects = tracker.update(rects)
     return objects
 
-def detect_in_process(proto, model, ssd_proc, frame_queue, person_queue, class_num, min_confidence):
+def detect_in_process(proto, model, ssd_proc, frame_queue, person_queue, class_num, tolerance):
     ssd_net = CaffeModelLoader.load(proto, model)
     ssd = ShotDetector(ssd_proc, ssd_net)
     while True:
         if not frame_queue.empty():
             frame = frame_queue.get()
             obj_data = ssd.detect(frame)
-            persons = ssd.get_objects(frame, obj_data, class_num, min_confidence)
+            persons = ssd.get_objects(frame, obj_data, class_num, tolerance)
             person_queue.put(persons)
 
 class RealtimeVideoDetector:
@@ -185,7 +188,7 @@ class RealtimeVideoDetector:
             if (persons is not None) and (len(persons) > 0):
                 Utils.draw_objects(persons, 'PERSON', (0, 0, 255), frame)
 
-            ids = track_objects(tracker, persons, frame)
+            ids = track_objects(tracker, persons)
             if (ids is not None) and (len(ids) > 0):
                 Utils.draw_ids(ids, (0, 255, 0), frame)
 
