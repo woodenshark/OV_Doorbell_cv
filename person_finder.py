@@ -107,12 +107,14 @@ class ShotDetector():
             objects = self.destroy_subboxes(objects)
         return objects
 
-def track_objects(tracker, objects) -> OrderedDict:
+def handle_objects(tracker, finder, objects, frame) -> None:
     if (objects is None) or (len(objects) == 0):
         tracker.update([])
         return None
 
+    padding = 100 # for face recognition frame enlarge
     rects = []
+    faces = []
     for obj in objects:
         (_, (x_start, y_start, width, height)) =  obj
         x_end = x_start + width
@@ -120,8 +122,16 @@ def track_objects(tracker, objects) -> OrderedDict:
 
         rect = (x_start, y_start, x_end, y_end)
         rects.append(rect)
-    objects = tracker.update(rects)
-    return objects
+
+        subframe = frame[
+            max(y_start - padding, 0):min(y_end + padding, frame.shape[0]),
+            max(x_start - padding, 0):min(x_end + padding, frame.shape[1])]
+        faces.append(finder.find_faces(subframe))
+    ids = tracker.update(rects)
+    Utils.draw_ids(ids, (0, 255, 0), frame)
+    Utils.draw_objects(objects, 'PERSON', (0, 0, 255), frame)
+    for face in faces:
+        Utils.draw_face_boxes(face[0], face[1], face[2], frame)
 
 def detect_in_process(proto, model, ssd_proc, frame_queue, person_queue, class_num, tolerance):
     ssd_net = CaffeModelLoader.load(proto, model)
@@ -162,6 +172,7 @@ class RealtimeVideoDetector:
         persons = None
         ids = None
         tracker = ObjectTracker()
+        finder = FaceFinder('encodings.pickle', 0.6)
         # Capture all frames
         while(True):
             t1 = time.time()
@@ -185,12 +196,7 @@ class RealtimeVideoDetector:
                 # for debug
                 #print ('Get from person queue ...' + str(len(persons)))
 
-            if (persons is not None) and (len(persons) > 0):
-                Utils.draw_objects(persons, 'PERSON', (0, 0, 255), frame)
-
-            ids = track_objects(tracker, persons)
-            if (ids is not None) and (len(ids) > 0):
-                Utils.draw_ids(ids, (0, 255, 0), frame)
+            handle_objects(tracker, finder, persons, frame)
 
             # Display the resulting frame
             cv2.imshow('Person detection', frame)
