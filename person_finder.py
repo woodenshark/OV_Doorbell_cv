@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from re import A
 from typing import OrderedDict
 import cv2
 import time
@@ -112,7 +113,7 @@ def handle_objects(tracker, finder, objects, frame) -> None:
         tracker.update([])
         return None
 
-    padding = 100 # for face recognition frame enlarge
+    padding = 20 # for face recognition frame enlarge
     rects = []
     faces = []
     for obj in objects:
@@ -123,10 +124,24 @@ def handle_objects(tracker, finder, objects, frame) -> None:
         rect = (x_start, y_start, x_end, y_end)
         rects.append(rect)
 
+        sub_y_start = max(y_start - padding, 0)
+        sub_y_end = min(y_end + padding, frame.shape[0])
+        sub_x_start = max(x_start - padding, 0)
+        sub_x_end = min(x_end + padding, frame.shape[1])
         subframe = frame[
-            max(y_start - padding, 0):min(y_end + padding, frame.shape[0]),
-            max(x_start - padding, 0):min(x_end + padding, frame.shape[1])]
-        faces.append(finder.find_faces(subframe))
+            sub_y_start:sub_y_end,
+            sub_x_start:sub_x_end
+        ]
+
+        (boxes, names, percents) = finder.find_faces(subframe)
+        # reframe face boxes to main frame
+        for i in range(len(boxes)):
+            (sy1, sx2, sy2, sx1) = boxes[i]
+            boxes[i] = (
+                sub_y_start + sy1, sub_x_start + sx2,
+                sub_y_start + sy2, sub_x_start + sx1,
+            )
+        faces.append((boxes, names, percents))
     ids = tracker.update(rects)
     Utils.draw_ids(ids, (0, 255, 0), frame)
     Utils.draw_objects(objects, 'PERSON', (0, 0, 255), frame)
