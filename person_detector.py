@@ -39,7 +39,7 @@ class RealtimeVideoDetector:
         self.statistics = dict()
         self._delay = 0.040 # TODO: research delay for RPi
         self._padding = 20 # for face recognition frame enlarge
-        self._person_acc_filter = 50
+        self._person_acc_filter = 100
 
     def match_faces(self, ids, matching_array):
         names = list()
@@ -64,8 +64,9 @@ class RealtimeVideoDetector:
                 self.statistics[id_num]['detected'] = False
                 self.statistics[id_num]['person'] = [name]
 
-            if name != 'Unknown':
-                names.append(name)
+            if name == 'Unknown':
+                name = 'Stranger'
+            names.append(name)
         return names
 
     def proceed_objects(self, objects):
@@ -115,7 +116,7 @@ class RealtimeVideoDetector:
 
         ids = self.tracker.update(rects)
         # TODO: research mismatching from known person to stranger
-        name_arr = self.match_faces(ids, matching_array).copy()
+        name_arr = self.match_faces(ids, matching_array)
         faces = (box_arr, name_arr, perc_arr)
         # verbose output
         #Utils.draw_ids(ids, (0, 255, 0), self.frame) # tracker id point
