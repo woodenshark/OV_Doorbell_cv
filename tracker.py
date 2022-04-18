@@ -1,9 +1,10 @@
+#!/usr/bin/env python3
 from scipy.spatial import distance as dist
 from typing import OrderedDict
 import numpy as np
 
 class ObjectTracker():
-    def __init__(self, max_disappeared=50):
+    def __init__(self, max_disappeared=100):
         self.next_object_id = 0
         self.objects = OrderedDict()
         self.disappeared = OrderedDict()
