@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 from pathlib import Path
 from datetime import datetime
-from time import strftime
 import cv2
 import json
+from logging import Logger, basicConfig, DEBUG, getLogger
 
 
 class Output():
-    def __init__(self, filename='statistics.json'):
+    def __init__(self, log: Logger, filename='statistics.json'):
+        self.log = log
         self.stat_file = Path(filename)
         self.stat_file.touch(exist_ok=True)
 
@@ -16,7 +17,7 @@ class Output():
             try:
                 self.strangers_folder.mkdir(parents=True)
             except FileExistsError:
-                print(f'Can not create directory - "{self.strangers_folder}" file exists.')
+                self.log.error(f'Can not create directory - "{self.strangers_folder}" file exists.')
                 exit(-1)
 
     def update_statistics(self, person: str) -> None:
@@ -43,7 +44,7 @@ class Output():
             f.write(json_string)
 
     def report_name(self, person: str) -> None:
-        print(f'{person}')
+        self.log.info(f'{person}')
 
     def proceed_attendance(self, person: str, frame):
         self.update_statistics(person)
@@ -62,10 +63,17 @@ class Output():
 
             img_path = f'{path}/{time}.jpg'
             cv2.imwrite(img_path, frame)
-            print(f'{img_path} saved.')
+            self.log.debug(f'{img_path} saved.')
 
 if __name__ == '__main__':
-    out = Output()
+
+    basicConfig(
+        level=DEBUG,
+        format='%(asctime)s %(name)s %(levelname)s -- %(message)s'
+        )
+    log = getLogger()
+
+    out = Output(log)
     out.proceed_attendance('pi', None)
     out.proceed_attendance('Unknown', None)
     out.proceed_attendance('Stranger', None)
