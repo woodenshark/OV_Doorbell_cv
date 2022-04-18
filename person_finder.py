@@ -208,11 +208,9 @@ class RealtimeVideoDetector:
         try:
             video_source = int(video_source)
             vstream = VideoStream(src=video_source, framerate=10).start()
-            self._delay = 0
         except:
             if video_source == 'pi':
                 vstream = VideoStream(usePiCamera=True, framerate=10).start()
-                self._delay = 0
             else:
                 vstream = FileVideoStream(video_source).start()
         time.sleep(2)
@@ -228,8 +226,7 @@ class RealtimeVideoDetector:
         persons = None
         # Capture all frames
         while(True):
-            if self._delay:
-                t1 = time.time()
+            t1 = time.time()
 
             self.frame = vstream.read()
             if self.frame is None:
@@ -238,11 +235,10 @@ class RealtimeVideoDetector:
             if frame_queue.empty():
                 frame_queue.put(self.frame)
 
-            if self._delay:
-                dt = time.time() - t1
-                if dt < self._delay:
-                    st = self._delay - dt
-                    time.sleep(st)
+            dt = time.time() - t1
+            if dt < self._delay:
+                st = self._delay - dt
+                time.sleep(st)
 
             if not person_queue.empty():
                 persons = person_queue.get()

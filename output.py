@@ -13,7 +13,11 @@ class Output():
 
         self.strangers_folder = Path('detected_strangers')
         if not self.strangers_folder.is_dir():
-            self.strangers_folder.mkdir(parents=True)
+            try:
+                self.strangers_folder.mkdir(parents=True)
+            except FileExistsError:
+                print(f'Can not create directory - "{self.strangers_folder}" file exists.')
+                exit(-1)
 
     def update_statistics(self, person: str) -> None:
         with self.stat_file.open(mode='r+') as f:
