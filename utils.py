@@ -6,6 +6,11 @@ import pickle
 
 class Utils():
     @staticmethod
+    def caffe_model_loader(proto, model):
+        net = cv2.dnn.readNetFromCaffe(proto, model)
+        return net
+
+    @staticmethod
     def pickle_model_loader(log, model):
         path = Path(model)
         if not path.exists():
