@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
-from re import A
-from typing import OrderedDict
 import cv2
 import time
-import imutils
 import argparse
 import numpy as np
 
 from multiprocessing import Process
 from multiprocessing import Queue
 from imutils.video import VideoStream, FileVideoStream
+from imutils import resize
 from tracker import ObjectTracker
 from face_finder import FaceFinder
 from utils import Utils
+from statistics import mode
+from datetime import datetime
+
+from output import Output
+
 
 class CaffeModelLoader():
     @staticmethod
@@ -32,7 +35,7 @@ class FrameProcessor():
         if w > h:
             dx = int((w - h) / 2)
             img = frame[0:h, dx:dx + h]
-        resized = imutils.resize(img, self.size, self.size, cv2.INTER_AREA)
+        resized = resize(img, self.size, self.size, cv2.INTER_AREA)
         blob = cv2.dnn.blobFromImage(resized, self.scale, (self.size, self.size), self.mean)
         return blob
 
@@ -81,7 +84,7 @@ class ShotDetector():
 
         return objects
 
-    def _check_inclusion(box_a, box_b):
+    def _check_inclusion(self, box_a, box_b):
         padding = 50 # for decrease target box dimensions
         pt_inside = lambda lim1, lim2, coord: lim1 < coord < lim2
         x_a, y_a, w_a, h_a = box_a
@@ -108,46 +111,6 @@ class ShotDetector():
             objects = self.destroy_subboxes(objects)
         return objects
 
-def handle_objects(tracker, finder, objects, frame) -> None:
-    if (objects is None) or (len(objects) == 0):
-        tracker.update([])
-        return None
-
-    padding = 20 # for face recognition frame enlarge
-    rects = []
-    faces = []
-    for obj in objects:
-        (_, (x_start, y_start, width, height)) =  obj
-        x_end = x_start + width
-        y_end = y_start + height
-
-        rect = (x_start, y_start, x_end, y_end)
-        rects.append(rect)
-
-        sub_y_start = max(y_start - padding, 0)
-        sub_y_end = min(y_end + padding, frame.shape[0])
-        sub_x_start = max(x_start - padding, 0)
-        sub_x_end = min(x_end + padding, frame.shape[1])
-        subframe = frame[
-            sub_y_start:sub_y_end,
-            sub_x_start:sub_x_end
-        ]
-
-        (boxes, names, percents) = finder.find_faces(subframe)
-        # reframe face boxes to main frame
-        for i in range(len(boxes)):
-            (sy1, sx2, sy2, sx1) = boxes[i]
-            boxes[i] = (
-                sub_y_start + sy1, sub_x_start + sx2,
-                sub_y_start + sy2, sub_x_start + sx1,
-            )
-        faces.append((boxes, names, percents))
-    ids = tracker.update(rects)
-    Utils.draw_ids(ids, (0, 255, 0), frame)
-    Utils.draw_objects(objects, 'PERSON', (0, 0, 255), frame)
-    for face in faces:
-        Utils.draw_face_boxes(face[0], face[1], face[2], frame)
-
 def detect_in_process(proto, model, ssd_proc, frame_queue, person_queue, class_num, tolerance):
     ssd_net = CaffeModelLoader.load(proto, model)
     ssd = ShotDetector(ssd_proc, ssd_net)
@@ -163,7 +126,83 @@ class RealtimeVideoDetector:
         self.ssd_proc = ssd_proc
         self.proto = proto
         self.model = model
+        self.frame = None
+        self.tracker = ObjectTracker()
+        self.face_finder = FaceFinder('encodings.pickle', 0.6)
+        self.output = Output()
+        self.statistics = dict()
         self._delay = 0.040
+        self._padding = 20 # for face recognition frame enlarge
+        self._person_acc_filter = 50
+
+    def match_faces(self, ids, matching_array):
+        for (id_num, id_point) in ids.items():
+            name = 'Unknown'
+            for match in matching_array:
+                match_point, match_name = match
+                if match_point == tuple(id_point):
+                    name = match_name[0]
+            if id_num in self.statistics:
+                if not self.statistics[id_num]['detected']:
+                    self.statistics[id_num]['person'].append(name)
+                    if len(self.statistics[id_num]['person']) > self._person_acc_filter:
+                        self.statistics[id_num]['detected'] = True
+                        self.statistics[id_num]['person'] = mode(self.statistics[id_num]['person'])
+                        self.statistics[id_num]['timestamp'] = str(datetime.now())
+                        self.output.proceed_attendance(self.statistics[id_num]['person'], self.frame)
+            else:
+                self.statistics[id_num] = dict()
+                self.statistics[id_num]['detected'] = False
+                self.statistics[id_num]['person'] = [name]
+
+    def proceed_objects(self, objects):
+        if (objects is None) or (len(objects) == 0):
+            self.tracker.update([])
+            return None
+
+        rects = []
+        faces = []
+        matching_array = []
+        for obj in objects:
+            (_, (x_start, y_start, width, height)) =  obj
+            x_end = x_start + width
+            y_end = y_start + height
+
+            rect = (x_start, y_start, x_end, y_end)
+            rects.append(rect)
+
+            sub_y_start = max(y_start - self._padding, 0)
+            sub_y_end = min(y_end + self._padding, self.frame.shape[0])
+            sub_x_start = max(x_start - self._padding, 0)
+            sub_x_end = min(x_end + self._padding, self.frame.shape[1])
+            subframe = self.frame[
+                sub_y_start:sub_y_end,
+                sub_x_start:sub_x_end
+            ]
+
+            (boxes, names, percents) = self.face_finder.find_faces(subframe)
+            # reframe face boxes to main frame
+            for i in range(len(boxes)):
+                (sy1, sx2, sy2, sx1) = boxes[i]
+                boxes[i] = (
+                    sub_y_start + sy1, sub_x_start + sx2,
+                    sub_y_start + sy2, sub_x_start + sx1,
+                )
+            faces.append((boxes, names, percents))
+
+            start_x, start_y, end_x, end_y = rect
+            c_x = int((start_x + end_x) / 2.0)
+            c_y = int((start_y + end_y) / 2.0)
+            centroid = (c_x, c_y)
+            if names:
+                matching_array.append((centroid, names))
+
+        ids = self.tracker.update(rects)
+        self.match_faces(ids, matching_array)
+        Utils.draw_ids(ids, (0, 255, 0), self.frame)
+        Utils.draw_objects(objects, 'PERSON', (0, 0, 255), self.frame)
+        for face in faces:
+            Utils.draw_face_boxes(face[0], face[1], face[2], self.frame)
 
     def detect(self, video_source, class_num, tolerance):
         try:
@@ -185,21 +224,16 @@ class RealtimeVideoDetector:
         detect_proc.start()
 
         persons = None
-        ids = None
-        tracker = ObjectTracker()
-        finder = FaceFinder('encodings.pickle', 0.6)
         # Capture all frames
         while(True):
             t1 = time.time()
 
-            frame = vstream.read()
-            if frame is None:
+            self.frame = vstream.read()
+            if self.frame is None:
                 break
 
             if frame_queue.empty():
-                # for debug
-                #print ('Put into frame queue ...' + str(frame_num))
-                frame_queue.put(frame)
+                frame_queue.put(self.frame)
 
             dt = time.time() - t1
             if dt < self._delay:
@@ -208,13 +242,11 @@ class RealtimeVideoDetector:
 
             if not person_queue.empty():
                 persons = person_queue.get()
-                # for debug
-                #print ('Get from person queue ...' + str(len(persons)))
 
-            handle_objects(tracker, finder, persons, frame)
+            self.proceed_objects(persons)
 
             # Display the resulting frame
-            cv2.imshow('Person detection', frame)
+            cv2.imshow('Person detection', self.frame)
             key = cv2.waitKey(1) & 0xFF
 
             if key == 27 or key == 113:
@@ -227,11 +259,11 @@ class RealtimeVideoDetector:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Person detection script.',
+        description='Person detection and face recognition tool.',
         add_help=False)
     parser.add_argument(
         '-h', '--help', action='help', default=argparse.SUPPRESS,
-        help='Works asynchronously using queue and threaded video.')
+        help='Press escape or q key to exit.')
     parser.add_argument('-v', '--video', help='Video source (camera index, filepath or "pi" for picamera)', required=True)
     parser.add_argument('-t', '--tolerance', help='Detection tolerance', default=0.5)
     args = parser.parse_args()
