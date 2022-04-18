@@ -19,7 +19,8 @@ class FaceFinder():
             exit(-1)
 
         print('Loading encodings for face detector')
-        self.data = pickle.loads(path.open(mode='rb').read())
+        with path.open(mode='rb') as f:
+            self.data = pickle.loads(f.read())
         self.tolerance = tolerance
 
     def find_faces(self, frame):
