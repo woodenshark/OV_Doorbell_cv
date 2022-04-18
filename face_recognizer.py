@@ -1,26 +1,20 @@
 #!/usr/bin/env python3
 from imutils.video import VideoStream, FileVideoStream
-from pathlib import Path
+from imutils import resize
 import face_recognition
 import argparse
-import imutils
-import pickle
 import time
 import cv2
 import numpy as np
+from logging import Logger, basicConfig, DEBUG, getLogger
+
 from utils import Utils
 
 
-class FaceFinder():
-    def __init__(self, model, tolerance):
-        path = Path(model)
-        if not path.exists():
-            print(f'Model encodings file {model} is not found.')
-            exit(-1)
-
-        print('Loading encodings for face detector')
-        with path.open(mode='rb') as f:
-            self.data = pickle.loads(f.read())
+class FaceRecognizer():
+    def __init__(self, log: Logger, model: str, tolerance: float):
+        self.log = log
+        self.data = Utils.pickle_model_loader(log, model)
         self.tolerance = tolerance
 
     def find_faces(self, frame):
@@ -54,11 +48,11 @@ class FaceFinder():
             names.append(name)
             percs.append(perc)
 
-        return boxes, names, percs
+        return (boxes, names, percs)
 
-def recognition_loop(video_source: str, model: str, tolerance: float):
-    ff = FaceFinder(model, tolerance)
-    print('Starting video stream')
+def recognition_loop(log: Logger, video_source: str, model: str, tolerance: float):
+    face_req = FaceRecognizer(log, model, tolerance)
+    log.info('Starting video stream')
     try:
         video_source = int(video_source)
         vstream = VideoStream(src=video_source, framerate=10).start()
@@ -73,9 +67,13 @@ def recognition_loop(video_source: str, model: str, tolerance: float):
         # grab the frame from the threaded video stream and resize it
         # to 500px (to speedup processing)
         frame = vstream.read()
-        frame = imutils.resize(frame, width=500)
+        frame = resize(frame, width=500)
 
-        ff.find_faces(frame, verbose=True)
+        face_result = face_req.find_faces(frame)
+        (boxes, names, tolerances) = face_result
+        log.debug(f'Found {names} with {tolerances} confidence in {boxes}.')
+
+        Utils.draw_face_boxes(face_result, frame)
 
         # display the image to our screen
         cv2.imshow('Facial Recognition', frame)
@@ -83,7 +81,7 @@ def recognition_loop(video_source: str, model: str, tolerance: float):
 
         if key == 27 or key == 113:
             # esc or q button
-            print("Quitting...")
+            log.info(f'Quitting...')
             break
 
     cv2.destroyAllWindows()
@@ -103,4 +101,11 @@ if __name__ == "__main__":
     video = args.video
     model = args.model
     tolerance = float(args.tolerance)
-    recognition_loop(video, model, tolerance)
+
+    basicConfig(
+        level=DEBUG,
+        format='%(asctime)s %(name)s %(levelname)s -- %(message)s'
+        )
+    log = getLogger()
+
+    recognition_loop(log, video, model, tolerance)
