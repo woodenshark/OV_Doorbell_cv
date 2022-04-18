@@ -14,6 +14,8 @@ from utils import Utils
 from statistics import mode
 from datetime import datetime
 
+from output import Output
+
 
 class CaffeModelLoader():
     @staticmethod
@@ -127,6 +129,7 @@ class RealtimeVideoDetector:
         self.frame = None
         self.tracker = ObjectTracker()
         self.face_finder = FaceFinder('encodings.pickle', 0.6)
+        self.output = Output()
         self.statistics = dict()
         self._delay = 0.040
         self._padding = 20 # for face recognition frame enlarge
@@ -146,6 +149,7 @@ class RealtimeVideoDetector:
                         self.statistics[id_num]['detected'] = True
                         self.statistics[id_num]['person'] = mode(self.statistics[id_num]['person'])
                         self.statistics[id_num]['timestamp'] = str(datetime.now())
+                        self.output.proceed_attendance(self.statistics[id_num]['person'], self.frame)
             else:
                 self.statistics[id_num] = dict()
                 self.statistics[id_num]['detected'] = False
