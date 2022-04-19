@@ -16,7 +16,7 @@ The [MobileNet CNN](https://github.com/chuanqi305/MobileNet-SSD) is a suitable m
 
 Our code implements a ```FrameProcessor class``` with size=300 because the models we use works with images sized 300 x 300 pixels. The scale and mean parameters have the same values that were used for the MobileNet model training. These values must always be assigned to the model’s training values, else the precision of the model decreases. The person_class value is 15 because human is the 15-th class in the model context. However, since the model was trained on square images it searches objects in centered square subframe (blue border on image below). FrameProcessor also excludes inner object boxes and object data is being transmitted to tracker and face recognizer. ```Tracker class``` instance handles centroids of found boxes for preventing assigning new id to previous person (green point).
 
-<img src="https://github.com/woodenshark/OV_Doorbell_cv/raw/belezyakov_doc/images/video_1.png" width="500">
+![](images/video_1.png)
 
 ## Face recognition
 
@@ -24,7 +24,7 @@ Our code implements a ```FrameProcessor class``` with size=300 because the model
 
 ```FaceRecognizer class (app/face_recognizer.py)``` proceeds each subframe (e.g., image below) from previous step with pickle encoded model of known faces and returns the result. After the tracked ids and recognized faces results are being matched and accumulated in internal dictionary. After length of detections for single id exceeds the hardcoded threshold value the id is being freezed for future matching with most common detected value, which is being assigned to the id object regardless to face recognition result in future.
 
-<img src="https://github.com/woodenshark/OV_Doorbell_cv/raw/belezyakov_doc/images/video_2.png" width="500">
+![](images/video_2.png)
 
 ## Frame processing
 

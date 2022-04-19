@@ -39,7 +39,7 @@ class RealtimeVideoDetector():
         self.statistics = dict()
         self._delay = 0.040 # TODO: research delay for RPi
         self._padding = 20 # for face recognition frame enlarge
-        self._person_acc_filter = 100
+        self._person_acc_filter = 50
 
     def match_faces(self, ids, matching_array):
         names = list()
