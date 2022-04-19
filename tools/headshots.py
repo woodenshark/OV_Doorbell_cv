@@ -54,7 +54,7 @@ if __name__ == "__main__":
         help='Press space to take a photo, escape or q to exit.')
     parser.add_argument('-c', '--camera', help='Camera video source', default=0)
     parser.add_argument('-p', '--person', help='Person name', required=True)
-    parser.add_argument('-d', '--dataset', help='Target dataset folder', default='dataset')
+    parser.add_argument('-d', '--dataset', help='Target dataset folder', default='../dataset')
     args = parser.parse_args()
     camera = int(args.camera)
     person = args.person
