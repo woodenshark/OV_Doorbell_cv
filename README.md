@@ -20,7 +20,7 @@ Output:
 
 Install 32-bit desktop OS by the [Raspberry Pi Image Tool](https://www.raspberrypi.com/software/). After booting and setting things up increase GPU memory size (since 76 MBytes can be somewhat small for vision projects) using the following menu
 
-<img src="https://github.com/woodenshark/OV_Doorbell_cv/raw/belezyakov_doc/images/raspi_config_1.jpg" width="400" height="380"> <img src="https://github.com/woodenshark/OV_Doorbell_cv/raw/belezyakov_doc/images/raspi_config_2.jpg" width="420" height="380">
+![](images/raspi_config_1.jpg) ![](images/raspi_config_2.jpg)
 
 With a fresh and clean Raspbian operating system, check the EEPROM software version. Check, and if needed update, the EEPROMs with the following commands:
 ```
