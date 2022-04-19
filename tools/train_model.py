@@ -54,7 +54,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '-h', '--help', action='help', default=argparse.SUPPRESS,
         help='Provide args for custom dataset folder or output file.')
-    parser.add_argument('-o', '--output', help='Target output file', default='../encodings.pickle')
+    parser.add_argument('-o', '--output', help='Target output file', default='../models/encodings.pickle')
     parser.add_argument('-d', '--dataset', help='Source dataset folder', default='../dataset')
     args = parser.parse_args()
     output = args.output
