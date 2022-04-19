@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 import cv2
 import time
-import argparse
 from multiprocessing import Process
 from multiprocessing import Queue
 from imutils.video import VideoStream, FileVideoStream
 from statistics import mode
-from logging import Logger, basicConfig, DEBUG, getLogger
+from logging import Logger
 
-from single_shot_detector import FrameProcessor, SingleShotDetector
-from tracker import ObjectTracker
-from face_recognizer import FaceRecognizer
-from utils import Utils
-from output import Output
+from .single_shot_detector import FrameProcessor, SingleShotDetector
+from .tracker import ObjectTracker
+from .face_recognizer import FaceRecognizer
+from .utils import Utils
+from .output import Output
 
 
 def detect_in_process(proto, model, proc_frame_size, frame_queue, person_queue, class_num, tolerance):
@@ -26,7 +25,7 @@ def detect_in_process(proto, model, proc_frame_size, frame_queue, person_queue, 
             persons = ssd.get_objects(frame, obj_data, class_num, tolerance)
             person_queue.put(persons)
 
-class RealtimeVideoDetector:
+class RealtimeVideoDetector():
     def __init__(self, log: Logger, proto, model, proc_frame_size):
         self.log = log
         self.proc_frame_size = proc_frame_size
@@ -34,7 +33,7 @@ class RealtimeVideoDetector:
         self.model = model
         self.frame = None
         self.tracker = ObjectTracker()
-        self.face_finder = FaceRecognizer(log, 'encodings.pickle', 0.5)
+        self.face_finder = FaceRecognizer(log, 'models/encodings.pickle', 0.5)
         self.output = Output(log)
         self.statistics = dict()
         self._delay = 0.040 # TODO: research delay for RPi
@@ -177,29 +176,5 @@ class RealtimeVideoDetector:
         vstream.stop()
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description='Person detection and face recognition tool.',
-        add_help=False)
-    parser.add_argument(
-        '-h', '--help', action='help', default=argparse.SUPPRESS,
-        help='Press escape or q key to exit.')
-    parser.add_argument('-v', '--video', help='Video source (camera index, filepath or "pi" for picamera)', required=True)
-    parser.add_argument('-t', '--tolerance', help='Detection tolerance', default=0.5)
-    args = parser.parse_args()
-    video = args.video
-    tolerance = float(args.tolerance)
-
-    basicConfig(
-        level=DEBUG,
-        format='%(asctime)s %(name)s %(levelname)s -- %(message)s'
-        )
-    log = getLogger()
-
-    # MobileNet pretrained model
-    proto_file = r'mobilenet.prototxt'
-    model_file = r'mobilenet.caffemodel'
-    proc_frame_size = 300
-    person_class = 15
-
-    video_detector = RealtimeVideoDetector(log, proto_file, model_file, proc_frame_size)
-    video_detector.detect(video, person_class, tolerance)
+    # TODO: write some short app
+    pass
