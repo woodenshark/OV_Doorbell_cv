@@ -6,6 +6,7 @@ import argparse
 import time
 import cv2
 import numpy as np
+from os.path import exists
 from logging import Logger, basicConfig, DEBUG, getLogger
 
 try:
@@ -54,7 +55,7 @@ class FaceRecognizer():
         return (boxes, names, percs)
 
 def recognition_loop(log: Logger, video_source: str, model: str, tolerance: float):
-    face_req = FaceRecognizer(log, model, tolerance)
+    face_rec = FaceRecognizer(log, model, tolerance)
     log.info('Starting video stream')
     try:
         video_source = int(video_source)
@@ -63,7 +64,11 @@ def recognition_loop(log: Logger, video_source: str, model: str, tolerance: floa
         if video_source == 'pi':
             vstream = VideoStream(usePiCamera=True, framerate=10).start()
         else:
-            vstream = FileVideoStream(video_source).start()
+            if exists(video_source):
+                vstream = FileVideoStream(video_source).start()
+            else:
+                log.error(f'File {video_source} not found.')
+                exit(-1)
     time.sleep(2)
 
     while True:
@@ -72,7 +77,7 @@ def recognition_loop(log: Logger, video_source: str, model: str, tolerance: floa
         frame = vstream.read()
         frame = resize(frame, width=500)
 
-        face_result = face_req.find_faces(frame)
+        face_result = face_rec.find_faces(frame)
         (boxes, names, tolerances) = face_result
         log.debug(f'Found {names} with {tolerances} confidence in {boxes}.')
 

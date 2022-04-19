@@ -6,6 +6,7 @@ from multiprocessing import Queue
 from imutils.video import VideoStream, FileVideoStream
 from statistics import mode
 from logging import Logger
+from os.path import exists
 
 from .single_shot_detector import FrameProcessor, SingleShotDetector
 from .tracker import ObjectTracker
@@ -130,7 +131,11 @@ class RealtimeVideoDetector():
             if video_source == 'pi':
                 vstream = VideoStream(usePiCamera=True, framerate=10).start()
             else:
-                vstream = FileVideoStream(video_source).start()
+                if exists(video_source):
+                    vstream = FileVideoStream(video_source).start()
+                else:
+                    self.log.error(f'File {video_source} not found.')
+                    exit(-1)
         time.sleep(2)
 
         frame_queue = Queue(maxsize=1)
