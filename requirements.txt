@@ -1,0 +1,4 @@
+face-recognition
+imutils
+unittest
+picamera[array]
