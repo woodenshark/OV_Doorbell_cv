@@ -16,7 +16,7 @@ class Test_model_with_dataset(unittest.TestCase):
         self.img_paths = tuple(path.rglob('*.jpg'))
         self.tolerance = 0.6
         log = unittest.mock.Mock()
-        self.face_finder = FaceRecognizer(log, '../encodings.pickle', self.tolerance)
+        self.face_finder = FaceRecognizer(log, '../models/encodings.pickle', self.tolerance)
 
     def test_person(self):
         for img_path in self.img_paths:

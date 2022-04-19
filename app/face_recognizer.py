@@ -8,7 +8,10 @@ import cv2
 import numpy as np
 from logging import Logger, basicConfig, DEBUG, getLogger
 
-from .utils import Utils
+try:
+    from .utils import Utils
+except:
+    from utils import Utils
 
 
 class FaceRecognizer():
