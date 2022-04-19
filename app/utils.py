@@ -1,8 +1,27 @@
 #!/usr/bin/env python3
 import cv2
+from pathlib import Path
+import pickle
 
 
 class Utils():
+    @staticmethod
+    def caffe_model_loader(proto, model):
+        net = cv2.dnn.readNetFromCaffe(proto, model)
+        return net
+
+    @staticmethod
+    def pickle_model_loader(log, model):
+        path = Path(model)
+        if not path.exists():
+            log.error(f'Model encodings file {model} is not found.')
+            exit(-1)
+
+        log.info('Loading encodings for face recognizer.')
+        with path.open(mode='rb') as f:
+            data = pickle.loads(f.read())
+        return data
+
     @staticmethod
     def draw_object(obj, label, color, frame):
         (tolerance, (x1, y1, w, h)) =  obj
@@ -30,8 +49,8 @@ class Utils():
             cv2.circle(frame, (centroid[0], centroid[1]), 4, color, -1)
 
     @staticmethod
-    def draw_face_boxes(boxes, names, percs, frame):
-        for ((top, right, bottom, left), name, perc) in zip(boxes, names, percs):
+    def draw_face_boxes(face_result, frame):
+        for ((top, right, bottom, left), name, perc) in zip(*face_result):
             cv2.rectangle(frame, (left, top), (right, bottom),
                 (0, 255, 225), 2)
             y = top - 15 if top - 15 > 15 else top + 15
