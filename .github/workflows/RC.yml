@@ -1,0 +1,33 @@
+name: Create release candidate
+on:
+  push:
+    tags:
+      - "*.*.*_RC_*"
+
+jobs:
+  push_release_candidate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Make tag
+        run: echo "TAG=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+      - name: Make firmware version
+        run: echo "FW_VERSION=${TAG%_RC_*}" >> $GITHUB_ENV
+      - name: Get repository name
+        run: echo "REPOSITORY_NAME=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')" >> $GITHUB_ENV
+      - name: Make zipfile name
+        run: echo "ZIPFILE=${{ env.REPOSITORY_NAME }}-${{ env.FW_VERSION }}.zip" >> $GITHUB_ENV
+      - name: Put version to python
+        run: echo "__version__ = \"${{ env.FW_VERSION }}\"" > app/version.py
+      - run: cat app/version.py
+      - name: Zip asset
+        run: zip -r ${{ env.ZIPFILE }} .
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        id: create_release
+        with:
+          prerelease: true
+          name: ${{ env.FW_VERSION }}
+          tag_name: ${{ env.TAG }}
+          files: ${{ env.ZIPFILE }}
